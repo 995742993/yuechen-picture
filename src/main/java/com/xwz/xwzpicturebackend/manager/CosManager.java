@@ -66,7 +66,7 @@ public class CosManager {
         PicOperations picOperations = new PicOperations();
         // 1 表示返回原图信息
         picOperations.setIsPicInfo(1);
-        // 新建一个图片操作类的Rule内部类List，用来构造数据压缩配置
+        // 新建一个图片操作类的Rule内部类List，用来构造数据压缩配置，并且还可以创建缩略图的配置
         List<PicOperations.Rule> rules = new ArrayList<>();
         // 图片压缩（转成 webp 格式）
         String webpKey = FileUtil.mainName(key) + ".webp";
@@ -76,13 +76,16 @@ public class CosManager {
         compressRule.setFileId(webpKey);
         rules.add(compressRule);
         // 缩略图处理
-        PicOperations.Rule thumbnailRule = new PicOperations.Rule();
-        thumbnailRule.setBucket(cosClientConfig.getBucket());
-        String thumbnailKey = FileUtil.mainName(key) + "_thumbnail." + FileUtil.getSuffix(key);
-        thumbnailRule.setFileId(thumbnailKey);
-        // 缩放规则 /thumbnail/<Width>x<Height>>（如果大于原图宽高，则不处理）
-        thumbnailRule.setRule(String.format("imageMogr2/thumbnail/%sx%s>", 128, 128));
-        rules.add(thumbnailRule);
+        // 缩略图处理，仅对 > 20 KB 的图片生成缩略图
+        if (file.length() > 2 * 1024) {
+            PicOperations.Rule thumbnailRule = new PicOperations.Rule();
+            thumbnailRule.setBucket(cosClientConfig.getBucket());
+            String thumbnailKey = FileUtil.mainName(key) + "_thumbnail." + FileUtil.getSuffix(key);
+            thumbnailRule.setFileId(thumbnailKey);
+            // 缩放规则 /thumbnail/<Width>x<Height>>（如果大于原图宽高，则不处理）
+            thumbnailRule.setRule(String.format("imageMogr2/thumbnail/%sx%s>", 128, 128));
+            rules.add(thumbnailRule);
+        }
         // 构造处理参数
         picOperations.setRules(rules);
         putObjectRequest.setPicOperations(picOperations);
