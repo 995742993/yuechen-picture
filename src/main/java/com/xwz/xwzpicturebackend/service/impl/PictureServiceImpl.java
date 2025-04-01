@@ -19,6 +19,7 @@ import com.xwz.xwzpicturebackend.domain.vo.user.UserVO;
 import com.xwz.xwzpicturebackend.exception.BusinessException;
 import com.xwz.xwzpicturebackend.exception.ErrorCode;
 import com.xwz.xwzpicturebackend.exception.ThrowUtils;
+import com.xwz.xwzpicturebackend.manager.CosManager;
 import com.xwz.xwzpicturebackend.manager.FileManager;
 import com.xwz.xwzpicturebackend.manager.upload.FilePictureUpload;
 import com.xwz.xwzpicturebackend.manager.upload.PictureUploadTemplate;
@@ -32,6 +33,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.beans.BeanUtils;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -65,6 +67,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     @Resource
     private UserService userService;
 
+    @Resource
+    private CosManager cosManager;
 
     @Override
     public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser) {
@@ -331,8 +335,36 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         return uploadCount;
     }
 
+    @Async
+    @Override
+    public void clearPictureFile(Picture oldPicture) {
+        // 判断该图片是否被多条记录使用
+        String pictureUrl = oldPicture.getUrl();
+        long count = this.lambdaQuery()
+                .eq(Picture::getUrl, pictureUrl)
+                .count();
+        // 有不止一条记录用到了该图片，不清理
+        if (count > 1) {
+            return;
+        }
+        // FIXME 注意，这里的 url 包含了域名，实际上只要传 key 值（存储路径）就够了
+        cosManager.deleteObject(getPictureKey(oldPicture.getUrl()));
+        // 清理缩略图
+        String thumbnailUrl = oldPicture.getThumbnailUrl();
+        if (StrUtil.isNotBlank(thumbnailUrl)) {
+            cosManager.deleteObject(getPictureKey(thumbnailUrl));
+        }
+    }
 
 
+    private String getPictureKey(String URL) {
+        // 找到最后一个反斜杠的位置
+        int lastSlash = URL.lastIndexOf('/');
+        // 找到倒数第二个反斜杠的位置（从开头到最后一个反斜杠前的位置中找最后一个）
+        int secondLastSlash = URL.lastIndexOf('/', lastSlash - 1);
+        int slash = URL.lastIndexOf('/', secondLastSlash - 1);
+        return URL.substring(slash);
+    }
 }
 
 

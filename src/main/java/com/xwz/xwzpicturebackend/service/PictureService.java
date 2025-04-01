@@ -10,6 +10,7 @@ import com.xwz.xwzpicturebackend.domain.dto.picture.PictureUploadRequest;
 import com.xwz.xwzpicturebackend.domain.entity.Picture;
 import com.xwz.xwzpicturebackend.domain.entity.User;
 import com.xwz.xwzpicturebackend.domain.vo.picture.PictureVO;
+import org.springframework.scheduling.annotation.Async;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -55,4 +56,6 @@ public interface PictureService extends IService<Picture> {
             User loginUser
     );
 
+    @Async
+    void clearPictureFile(Picture oldPicture);
 }
