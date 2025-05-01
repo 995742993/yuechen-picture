@@ -73,6 +73,11 @@ public class UserController {
         return ResultUtils.success(loginUserVO);
     }
 
+    /**
+     * 获取已登录的用户信息
+     * @param request
+     * @return
+     */
     @GetMapping("/get/login")
     public BaseResponse<LoginUserVO> getLoginUser(HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
@@ -118,7 +123,7 @@ public class UserController {
     }
 
     /**
-     * 根据 id 获取包装类
+     * 根据 id 获取用户的包装类
      */
     @GetMapping("/get/vo")
     public BaseResponse<UserVO> getUserVOById(long id) {
