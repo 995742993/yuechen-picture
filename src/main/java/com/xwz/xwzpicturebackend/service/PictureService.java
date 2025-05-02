@@ -3,6 +3,7 @@ package com.xwz.xwzpicturebackend.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.xwz.xwzpicturebackend.domain.dto.picture.PictureEditRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureQueryRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureReviewRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureUploadByBatchRequest;
@@ -23,7 +24,6 @@ public interface PictureService extends IService<Picture> {
     /**
      * 上传图片
      *
-     * @param multipartFile
      * @param pictureUploadRequest
      * @param loginUser
      * @return
@@ -58,4 +58,10 @@ public interface PictureService extends IService<Picture> {
 
     @Async
     void clearPictureFile(Picture oldPicture);
+
+    void checkPictureAuth(User loginUser, Picture picture);
+
+    void deletePicture(long pictureId, User loginUser);
+
+    void editPicture(PictureEditRequest pictureEditRequest, User loginUser);
 }

@@ -33,7 +33,7 @@ public class RateLimiterAspect {
         if (bucket.tryAcquire()) {
             return joinPoint.proceed();
         } else {
-            throw new BusinessException(ErrorCode.RATE_LIMIT_ERROR, "当前接口已达流量上限");
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "当前接口已达流量上限");
         }
     }
 }
