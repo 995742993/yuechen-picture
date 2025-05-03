@@ -25,6 +25,10 @@ import com.xwz.xwzpicturebackend.domain.vo.picture.PictureVO;
 import com.xwz.xwzpicturebackend.exception.BusinessException;
 import com.xwz.xwzpicturebackend.exception.ErrorCode;
 import com.xwz.xwzpicturebackend.exception.ThrowUtils;
+import com.xwz.xwzpicturebackend.manager.auth.SpaceUserAuthManager;
+import com.xwz.xwzpicturebackend.manager.auth.StpKit;
+import com.xwz.xwzpicturebackend.manager.auth.annotation.SaSpaceCheckPermission;
+import com.xwz.xwzpicturebackend.manager.auth.model.SpaceUserPermissionConstant;
 import com.xwz.xwzpicturebackend.service.PictureService;
 import com.xwz.xwzpicturebackend.service.SpaceService;
 import com.xwz.xwzpicturebackend.service.UserService;
@@ -70,6 +74,9 @@ public class PictureController {
     @Resource
     private SpaceService spaceService;
 
+    @Resource
+    private SpaceUserAuthManager spaceUserAuthManager;
+
 
 
     // 初始化本地缓存
@@ -81,10 +88,12 @@ public class PictureController {
                     .build();
 
 
+    // region 图片上传
     /**
      * 上传图片（可重新上传）
      */
     @PostMapping("/upload")
+    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_UPLOAD)
     public BaseResponse<PictureVO> uploadPicture(
             @RequestPart("file") MultipartFile multipartFile,
             PictureUploadRequest pictureUploadRequest,
@@ -96,71 +105,24 @@ public class PictureController {
     }
 
     /**
-     * 删除图片
+     * 通过 URL 上传图片（可重新上传）
      */
-    @PostMapping("/delete")
-    public BaseResponse<Boolean> deletePicture(@RequestBody DeleteRequest deleteRequest, HttpServletRequest request) {
-        if (deleteRequest == null || deleteRequest.getId() <= 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
+    @PostMapping("/upload/url")
+    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_UPLOAD)
+    public BaseResponse<PictureVO> uploadPictureByUrl(
+            @RequestBody PictureUploadRequest pictureUploadRequest,
+            HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
-        pictureService.deletePicture(deleteRequest.getId(), loginUser);
-        return ResultUtils.success(true);
+        String fileUrl = pictureUploadRequest.getFileUrl();
+        PictureVO pictureVO = pictureService.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
+        return ResultUtils.success(pictureVO);
     }
+    // endregion 图片上传
 
-
-
-
-    /**
-     * 更新图片（仅管理员可用）
-     */
-    @PostMapping("/update")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest, HttpServletRequest request) {
-        if (pictureUpdateRequest == null || pictureUpdateRequest.getId() <= 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        // 将实体类和 DTO 进行转换
-        Picture picture = new Picture();
-        BeanUtils.copyProperties(pictureUpdateRequest, picture);
-        // 注意将 list 转为 string
-        picture.setTags(JSONUtil.toJsonStr(pictureUpdateRequest.getTags()));
-        // 数据校验
-        pictureService.validPicture(picture);
-        // 判断是否存在
-        long id = pictureUpdateRequest.getId();
-        Picture oldPicture = pictureService.getById(id);
-        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
-        // 补充审核参数
-        User loginUser = userService.getLoginUser(request);
-        pictureService.fillReviewParams(picture, loginUser);
-        // 操作数据库
-        boolean result = pictureService.updateById(picture);
-        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-        return ResultUtils.success(true);
-    }
-
-
-
-
-
-
-    /**
-     * 根据 id 获取图片（仅管理员可用）
-     */
-    @GetMapping("/get")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Picture> getPictureById(long id, HttpServletRequest request) {
-        ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
-        // 查询数据库
-        Picture picture = pictureService.getById(id);
-        ThrowUtils.throwIf(picture == null, ErrorCode.NOT_FOUND_ERROR);
-        // 获取封装类
-        return ResultUtils.success(picture);
-    }
-
+    // region 图片查看
     /**
      * 根据 id 获取图片（封装类）
+     *
      */
     @GetMapping("/get/vo")
     public BaseResponse<PictureVO> getPictureVOById(long id, HttpServletRequest request) {
@@ -168,30 +130,26 @@ public class PictureController {
         // 查询数据库
         Picture picture = pictureService.getById(id);
         ThrowUtils.throwIf(picture == null, ErrorCode.NOT_FOUND_ERROR);
-        // 空间权限校验
+        // 空间的图片，需要校验权限
+        Space space = null;
         Long spaceId = picture.getSpaceId();
         if (spaceId != null) {
-            User loginUser = userService.getLoginUser(request);
-            pictureService.checkPictureAuth(loginUser, picture);
+            boolean hasPermission = StpKit.SPACE.hasPermission(SpaceUserPermissionConstant.PICTURE_VIEW);
+            ThrowUtils.throwIf(!hasPermission, ErrorCode.NO_AUTH_ERROR);
+            space = spaceService.getById(spaceId);
+            ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
         }
-
+        // 获取权限列表
+        User loginUser = userService.getLoginUser(request);
+        List<String> permissionList = spaceUserAuthManager.getPermissionList(space, loginUser);
+        PictureVO pictureVO = pictureService.getPictureVO(picture, request);
+        pictureVO.setPermissionList(permissionList);
         // 获取封装类
-        return ResultUtils.success(pictureService.getPictureVO(picture, request));
+        return ResultUtils.success(pictureVO);
     }
 
-    /**
-     * 分页获取图片列表（仅管理员可用）
-     */
-    @PostMapping("/list/page")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Page<Picture>> listPictureByPage(@RequestBody PictureQueryRequest pictureQueryRequest) {
-        long current = pictureQueryRequest.getCurrent();
-        long size = pictureQueryRequest.getPageSize();
-        // 查询数据库
-        Page<Picture> picturePage = pictureService.page(new Page<>(current, size),
-                pictureService.getQueryWrapper(pictureQueryRequest));
-        return ResultUtils.success(picturePage);
-    }
+
+
 
     /**
      * 分页获取图片列表（封装类）
@@ -211,13 +169,17 @@ public class PictureController {
             pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
             pictureQueryRequest.setNullSpaceId(true);
         } else {
-            // 私有空间
-            User loginUser = userService.getLoginUser(request);
-            Space space = spaceService.getById(spaceId);
-            ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
-            if (!loginUser.getId().equals(space.getUserId())) {
-                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间权限");
-            }
+            // 编程式鉴权方法，hasPermission方法最终会调用getPermissionList方法，并且这个方法就是我们实现的StpInterface接口的方法
+            boolean hasPermission = StpKit.SPACE.hasPermission(SpaceUserPermissionConstant.PICTURE_VIEW);
+            ThrowUtils.throwIf(!hasPermission, ErrorCode.NO_AUTH_ERROR);
+
+            // 私有空间 - SaToken鉴权替代
+//            User loginUser = userService.getLoginUser(request);
+//            Space space = spaceService.getById(spaceId);
+//            ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
+//            if (!loginUser.getId().equals(space.getUserId())) {
+//                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间权限");
+//            }
         }
         // 查询数据库
         Page<Picture> picturePage = pictureService.page(new Page<>(current, size),
@@ -225,11 +187,14 @@ public class PictureController {
         // 获取封装类
         return ResultUtils.success(pictureService.getPictureVOPage(picturePage, request));
     }
+    // endregion 图片查看
 
+    // region 图片编辑与删除
     /**
      * 编辑图片（给用户使用）
      */
     @PostMapping("/edit")
+    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_EDIT)
     public BaseResponse<Boolean> editPicture(@RequestBody PictureEditRequest pictureEditRequest, HttpServletRequest request) {
         if (pictureEditRequest == null || pictureEditRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -238,9 +203,23 @@ public class PictureController {
         return ResultUtils.success(true);
     }
 
+    /**
+     * 删除图片
+     */
+    @PostMapping("/delete")
+    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_DELETE)
+    public BaseResponse<Boolean> deletePicture(@RequestBody DeleteRequest deleteRequest, HttpServletRequest request) {
+        if (deleteRequest == null || deleteRequest.getId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        pictureService.deletePicture(deleteRequest.getId(), loginUser);
+        return ResultUtils.success(true);
+    }
 
+    // endregion 图片查看
 
-
+    // region 其他接口
     /**
      * 相当于字典接口
      * @return
@@ -255,6 +234,7 @@ public class PictureController {
         return ResultUtils.success(pictureTagCategory);
     }
 
+    // region 图片审核接口
     @PostMapping("/review")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> doPictureReview(@RequestBody PictureReviewRequest pictureReviewRequest,
@@ -265,20 +245,18 @@ public class PictureController {
         return ResultUtils.success(true);
     }
 
+    // endregion 图片审核接口
+    // endregion 其他接口
 
+    // region 图片查询-缓存（已废弃）
     /**
-     * 通过 URL 上传图片（可重新上传）
+     * 图片List查询-Redis缓存方案
+     * @param pictureQueryRequest
+     * @param request
+     * @return
+     *
      */
-    @PostMapping("/upload/url")
-    public BaseResponse<PictureVO> uploadPictureByUrl(
-            @RequestBody PictureUploadRequest pictureUploadRequest,
-            HttpServletRequest request) {
-        User loginUser = userService.getLoginUser(request);
-        String fileUrl = pictureUploadRequest.getFileUrl();
-        PictureVO pictureVO = pictureService.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
-        return ResultUtils.success(pictureVO);
-    }
-
+    @Deprecated
     @PostMapping("/list/page/vo/cache")
     public BaseResponse<Page<PictureVO>> listPictureVOByPageWithCache(@RequestBody PictureQueryRequest pictureQueryRequest,
                                                                       HttpServletRequest request) {
@@ -318,6 +296,14 @@ public class PictureController {
         return ResultUtils.success(pictureVOPage);
     }
 
+    /**
+     * 图片List查询-本地缓存方案
+     * 分页获取图片列表（封装类，有缓存）
+     * 暂时废弃，原因是考虑到私有空间的图片更新频率不好把握，之前编写的缓存分页查询图片接口可以暂不使用和修改
+     * @Deprecated
+     * @param pictureQueryRequest
+     */
+    @Deprecated
     @PostMapping("/list/page/vo/byLocalCache")
     public BaseResponse<Page<PictureVO>> listPictureVOByPageWithLocalCache(@RequestBody PictureQueryRequest pictureQueryRequest,
                                                                       HttpServletRequest request) {
@@ -351,6 +337,14 @@ public class PictureController {
         return ResultUtils.success(pictureVOPage);
     }
 
+    /**
+     * 图片List查询-多级缓存方案
+     * @param pictureQueryRequest
+     * @param request
+     * @return
+     *
+     */
+    @Deprecated
     @PostMapping("/list/page/vo/byMultiLevelCache")
     public BaseResponse<Page<PictureVO>> listPictureVOByPageWithMultiLevelCache(@RequestBody PictureQueryRequest pictureQueryRequest,
                                                                            HttpServletRequest request) {
@@ -395,7 +389,74 @@ public class PictureController {
         return ResultUtils.success(pictureVOPage);
     }
 
+    // endregion 图片查询-缓存（已废弃）
 
+
+    // region 仅管理员可用接口
+
+    /**
+     * 分页获取图片列表（仅管理员可用）
+     */
+    @PostMapping("/list/page")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Page<Picture>> listPictureByPage(@RequestBody PictureQueryRequest pictureQueryRequest) {
+        long current = pictureQueryRequest.getCurrent();
+        long size = pictureQueryRequest.getPageSize();
+        // 查询数据库
+        Page<Picture> picturePage = pictureService.page(new Page<>(current, size),
+                pictureService.getQueryWrapper(pictureQueryRequest));
+        return ResultUtils.success(picturePage);
+    }
+
+    /**
+     * 根据 id 获取图片（仅管理员可用）
+     */
+    @GetMapping("/get")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Picture> getPictureById(long id, HttpServletRequest request) {
+        ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
+        // 查询数据库
+        Picture picture = pictureService.getById(id);
+        ThrowUtils.throwIf(picture == null, ErrorCode.NOT_FOUND_ERROR);
+        // 获取封装类
+        return ResultUtils.success(picture);
+    }
+
+    /**
+     * 更新图片（仅管理员可用）
+     */
+    @PostMapping("/update")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest, HttpServletRequest request) {
+        if (pictureUpdateRequest == null || pictureUpdateRequest.getId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 将实体类和 DTO 进行转换
+        Picture picture = new Picture();
+        BeanUtils.copyProperties(pictureUpdateRequest, picture);
+        // 注意将 list 转为 string
+        picture.setTags(JSONUtil.toJsonStr(pictureUpdateRequest.getTags()));
+        // 数据校验
+        pictureService.validPicture(picture);
+        // 判断是否存在
+        long id = pictureUpdateRequest.getId();
+        Picture oldPicture = pictureService.getById(id);
+        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
+        // 补充审核参数
+        User loginUser = userService.getLoginUser(request);
+        pictureService.fillReviewParams(picture, loginUser);
+        // 操作数据库
+        boolean result = pictureService.updateById(picture);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(true);
+    }
+
+    /**
+     * TODO 仅管理员，后续改成但用户单接口一天3次
+     * @param pictureUploadByBatchRequest
+     * @param request
+     * @return
+     */
     @PostMapping("/upload/batch")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Integer> uploadPictureByBatch(
@@ -409,6 +470,7 @@ public class PictureController {
     }
 
 
+    // endregion 仅管理员可用接口
 
 
 

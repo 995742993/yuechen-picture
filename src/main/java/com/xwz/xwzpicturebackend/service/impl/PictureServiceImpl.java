@@ -22,11 +22,11 @@ import com.xwz.xwzpicturebackend.domain.vo.user.UserVO;
 import com.xwz.xwzpicturebackend.exception.BusinessException;
 import com.xwz.xwzpicturebackend.exception.ErrorCode;
 import com.xwz.xwzpicturebackend.exception.ThrowUtils;
-import com.xwz.xwzpicturebackend.manager.CosManager;
-import com.xwz.xwzpicturebackend.manager.FileManager;
-import com.xwz.xwzpicturebackend.manager.upload.FilePictureUpload;
-import com.xwz.xwzpicturebackend.manager.upload.PictureUploadTemplate;
-import com.xwz.xwzpicturebackend.manager.upload.URLPictureUpload;
+import com.xwz.xwzpicturebackend.manager.file.CosManager;
+import com.xwz.xwzpicturebackend.manager.file.FileManager;
+import com.xwz.xwzpicturebackend.manager.file.upload.FilePictureUpload;
+import com.xwz.xwzpicturebackend.manager.file.upload.PictureUploadTemplate;
+import com.xwz.xwzpicturebackend.manager.file.upload.URLPictureUpload;
 import com.xwz.xwzpicturebackend.mapper.PictureMapper;
 import com.xwz.xwzpicturebackend.service.PictureService;
 import com.xwz.xwzpicturebackend.service.SpaceService;
@@ -478,8 +478,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         // 判断是否存在
         Picture oldPicture = this.getById(pictureId);
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
-        // 校验权限
-        checkPictureAuth(loginUser, oldPicture);
+        // 校验权限 - 已经通过Sa-Token进行鉴权了
+        // checkPictureAuth(loginUser, oldPicture);
         // 开启事务
         transactionTemplate.execute(status -> {
             // 操作数据库
@@ -516,8 +516,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         long id = pictureEditRequest.getId();
         Picture oldPicture = this.getById(id);
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
-        // 校验权限
-        checkPictureAuth(loginUser, oldPicture);
+        // 校验权限 - 已经通过Sa-Token进行鉴权了
+        // checkPictureAuth(loginUser, oldPicture);
         // 补充审核参数
         this.fillReviewParams(picture, loginUser);
         // 操作数据库
