@@ -6,12 +6,14 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.xwz.xwzpicturebackend.domain.entity.Space;
-import com.xwz.xwzpicturebackend.domain.entity.User;
-import com.xwz.xwzpicturebackend.domain.enums.SpaceLevelEnum;
-import com.xwz.xwzpicturebackend.domain.enums.SpaceTypeEnum;
 import com.xwz.xwzpicturebackend.domain.dto.space.SpaceAddRequest;
 import com.xwz.xwzpicturebackend.domain.dto.space.SpaceQueryRequest;
+import com.xwz.xwzpicturebackend.domain.entity.Space;
+import com.xwz.xwzpicturebackend.domain.entity.SpaceUser;
+import com.xwz.xwzpicturebackend.domain.entity.User;
+import com.xwz.xwzpicturebackend.domain.enums.SpaceLevelEnum;
+import com.xwz.xwzpicturebackend.domain.enums.SpaceRoleEnum;
+import com.xwz.xwzpicturebackend.domain.enums.SpaceTypeEnum;
 import com.xwz.xwzpicturebackend.domain.vo.space.SpaceVO;
 import com.xwz.xwzpicturebackend.domain.vo.user.UserVO;
 import com.xwz.xwzpicturebackend.exception.BusinessException;
@@ -19,6 +21,7 @@ import com.xwz.xwzpicturebackend.exception.ErrorCode;
 import com.xwz.xwzpicturebackend.exception.ThrowUtils;
 import com.xwz.xwzpicturebackend.mapper.SpaceMapper;
 import com.xwz.xwzpicturebackend.service.SpaceService;
+import com.xwz.xwzpicturebackend.service.SpaceUserService;
 import com.xwz.xwzpicturebackend.service.UserService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -47,20 +50,27 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space> implements
     @Resource
     private TransactionTemplate transactionTemplate;
 
+    @Resource
+    private SpaceUserService spaceUserService;
+
     Map<Long, Object> lockMap = new ConcurrentHashMap<>();
 
     @Override
     public long addSpace(SpaceAddRequest spaceAddRequest, User loginUser) {
+
+        // 默认值
+        if (StrUtil.isBlank(spaceAddRequest.getSpaceName())) {
+            spaceAddRequest.setSpaceName("默认空间");
+        }
+        if (spaceAddRequest.getSpaceLevel() == null) {
+            spaceAddRequest.setSpaceLevel(SpaceLevelEnum.COMMON.getValue());
+        }
+        if (spaceAddRequest.getSpaceType() == null) {
+            spaceAddRequest.setSpaceType(SpaceTypeEnum.PRIVATE.getValue());
+        }
         // 在此处将实体类和 DTO 进行转换
         Space space = new Space();
         BeanUtils.copyProperties(spaceAddRequest, space);
-        // 默认值
-        if (StrUtil.isBlank(spaceAddRequest.getSpaceName())) {
-            space.setSpaceName("默认空间");
-        }
-        if (spaceAddRequest.getSpaceLevel() == null) {
-            space.setSpaceLevel(SpaceLevelEnum.COMMON.getValue());
-        }
         // 填充数据
         this.fillSpaceBySpaceLevel(space);
         // 数据校验
@@ -76,11 +86,25 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space> implements
         synchronized (lock) {
             try {
                 Long newSpaceId = transactionTemplate.execute(status -> {
-                    boolean exists = this.lambdaQuery().eq(Space::getUserId, userId).exists();
-                    ThrowUtils.throwIf(exists, ErrorCode.OPERATION_ERROR, "每个用户仅能有一个私有空间");
-                    // 写入数据库
+                    // 判断是否已有空间,this.lambdaQuery()就是相當於是一个简单查询语句
+                    boolean exists = this.lambdaQuery()
+                            .eq(Space::getUserId, userId)
+                            .eq(Space::getSpaceType, space.getSpaceType())
+                            .exists();
+                    // 如果已有空间，就不能再创建
+                    ThrowUtils.throwIf(exists, ErrorCode.OPERATION_ERROR, "每个用户每类空间只能创建一个");
+                    // 创建
                     boolean result = this.save(space);
-                    ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+                    ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "保存空间到数据库失败");
+                    // 创建成功后，如果是团队空间，关联新增团队成员记录
+                    if (SpaceTypeEnum.TEAM.getValue() == space.getSpaceType()) {
+                        SpaceUser spaceUser = new SpaceUser();
+                        spaceUser.setSpaceId(space.getId());
+                        spaceUser.setUserId(userId);
+                        spaceUser.setSpaceRole(SpaceRoleEnum.ADMIN.getValue());
+                        result = spaceUserService.save(spaceUser);
+                        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "创建团队成员记录失败");
+                    }
                     // 返回新写入的数据 id
                     return space.getId();
                 });
