@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qcloud.cos.model.COSObject;
 import com.qcloud.cos.model.COSObjectInputStream;
 import com.qcloud.cos.utils.IOUtils;
-import com.xwz.xwzpicturebackend.manager.CosManager;
+import com.xwz.xwzpicturebackend.manager.file.CosManager;
 import com.xwz.xwzpicturebackend.annotation.AuthCheck;
 import com.xwz.xwzpicturebackend.common.BaseResponse;
 import com.xwz.xwzpicturebackend.common.DeleteRequest;
