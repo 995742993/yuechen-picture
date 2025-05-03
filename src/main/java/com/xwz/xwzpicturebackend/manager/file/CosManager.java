@@ -1,4 +1,4 @@
-package com.xwz.xwzpicturebackend.manager;
+package com.xwz.xwzpicturebackend.manager.file;
 
 import cn.hutool.core.io.FileUtil;
 import com.qcloud.cos.COSClient;

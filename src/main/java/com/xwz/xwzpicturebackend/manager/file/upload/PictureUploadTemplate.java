@@ -1,4 +1,4 @@
-package com.xwz.xwzpicturebackend.manager.upload;
+package com.xwz.xwzpicturebackend.manager.file.upload;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
@@ -13,7 +13,7 @@ import com.xwz.xwzpicturebackend.config.CosClientConfig;
 import com.xwz.xwzpicturebackend.domain.dto.file.UploadPictureResult;
 import com.xwz.xwzpicturebackend.exception.BusinessException;
 import com.xwz.xwzpicturebackend.exception.ErrorCode;
-import com.xwz.xwzpicturebackend.manager.CosManager;
+import com.xwz.xwzpicturebackend.manager.file.CosManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

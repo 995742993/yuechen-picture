@@ -1,4 +1,4 @@
-package com.xwz.xwzpicturebackend.manager;
+package com.xwz.xwzpicturebackend.manager.file;
 
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;

@@ -1,4 +1,4 @@
-package com.xwz.xwzpicturebackend.manager.upload;
+package com.xwz.xwzpicturebackend.manager.file.upload;
 
 import cn.hutool.core.io.FileUtil;
 import com.xwz.xwzpicturebackend.exception.ErrorCode;
