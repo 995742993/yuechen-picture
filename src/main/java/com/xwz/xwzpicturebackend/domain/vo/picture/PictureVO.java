@@ -115,6 +115,10 @@ public class PictureVO implements Serializable {
      */
     private List<String> permissionList = new ArrayList<>();
 
+    /**
+     * 图片主色调
+     */
+    private String picColor;
 
 
 

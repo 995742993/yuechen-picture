@@ -18,6 +18,7 @@ import com.xwz.xwzpicturebackend.domain.dto.picture.PictureReviewRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureUpdateRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureUploadByBatchRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureUploadRequest;
+import com.xwz.xwzpicturebackend.domain.dto.picture.SearchPictureByColorRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.SearchPictureByPictureRequest;
 import com.xwz.xwzpicturebackend.domain.entity.Picture;
 import com.xwz.xwzpicturebackend.domain.entity.PictureTagCategory;
@@ -237,6 +238,12 @@ public class PictureController {
         return ResultUtils.success(pictureTagCategory);
     }
 
+    /**
+     * 上传的图片审核接口
+     * @param pictureReviewRequest
+     * @param request
+     * @return
+     */
     @PostMapping("/review")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> doPictureReview(@RequestBody PictureReviewRequest pictureReviewRequest,
@@ -261,6 +268,20 @@ public class PictureController {
         //List resultList ImageSearchApiFacade.searchlmage(url);
         List<ImageSearchResult> resultList = ImageSearchApiFacade.searchImage(url);
         return ResultUtils.success(resultList);
+    }
+
+    /**
+     * 按照颜色搜索
+     */
+    @PostMapping("/search/color")
+    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_VIEW)
+    public BaseResponse<List<PictureVO>> searchPictureByColor(@RequestBody SearchPictureByColorRequest searchPictureByColorRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(searchPictureByColorRequest == null, ErrorCode.PARAMS_ERROR);
+        String picColor = searchPictureByColorRequest.getPicColor();
+        Long spaceId = searchPictureByColorRequest.getSpaceId();
+        User loginUser = userService.getLoginUser(request);
+        List<PictureVO> pictureVOList = pictureService.searchPictureByColor(spaceId, picColor, loginUser);
+        return ResultUtils.success(pictureVOList);
     }
 
 
