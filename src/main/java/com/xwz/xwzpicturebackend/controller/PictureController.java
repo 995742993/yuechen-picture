@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.xwz.xwzpicturebackend.annotation.AuthCheck;
+import com.xwz.xwzpicturebackend.api.imagesearch.ImageSearchApiFacade;
+import com.xwz.xwzpicturebackend.api.imagesearch.model.ImageSearchResult;
 import com.xwz.xwzpicturebackend.common.BaseResponse;
 import com.xwz.xwzpicturebackend.common.DeleteRequest;
 import com.xwz.xwzpicturebackend.common.ResultUtils;
@@ -16,6 +18,7 @@ import com.xwz.xwzpicturebackend.domain.dto.picture.PictureReviewRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureUpdateRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureUploadByBatchRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureUploadRequest;
+import com.xwz.xwzpicturebackend.domain.dto.picture.SearchPictureByPictureRequest;
 import com.xwz.xwzpicturebackend.domain.entity.Picture;
 import com.xwz.xwzpicturebackend.domain.entity.PictureTagCategory;
 import com.xwz.xwzpicturebackend.domain.entity.Space;
@@ -234,7 +237,6 @@ public class PictureController {
         return ResultUtils.success(pictureTagCategory);
     }
 
-    // region 图片审核接口
     @PostMapping("/review")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> doPictureReview(@RequestBody PictureReviewRequest pictureReviewRequest,
@@ -245,7 +247,23 @@ public class PictureController {
         return ResultUtils.success(true);
     }
 
-    // endregion 图片审核接口
+    /**
+     * 以图搜图
+     */
+    @PostMapping("/search/picture")
+    public BaseResponse<List<ImageSearchResult>> searchPictureByPicture(@RequestBody SearchPictureByPictureRequest searchPictureByPictureRequest) {
+        ThrowUtils.throwIf(searchPictureByPictureRequest == null, ErrorCode.PARAMS_ERROR);
+        Long pictureId = searchPictureByPictureRequest.getPictureId();
+        ThrowUtils.throwIf(pictureId == null || pictureId <= 0, ErrorCode.PARAMS_ERROR);
+        Picture oldPicture = pictureService.getById(pictureId);
+        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
+        String url = oldPicture.getUrl() + "?imageMogr2/format/png";
+        //List resultList ImageSearchApiFacade.searchlmage(url);
+        List<ImageSearchResult> resultList = ImageSearchApiFacade.searchImage(url);
+        return ResultUtils.success(resultList);
+    }
+
+
     // endregion 其他接口
 
     // region 图片查询-缓存（已废弃）
