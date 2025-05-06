@@ -3,6 +3,8 @@ package com.xwz.xwzpicturebackend.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.xwz.xwzpicturebackend.api.aliyunai.model.CreateOutPaintingTaskResponse;
+import com.xwz.xwzpicturebackend.domain.dto.picture.CreatePictureOutPaintingTaskRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureEditRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureQueryRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureReviewRequest;
@@ -67,4 +69,12 @@ public interface PictureService extends IService<Picture> {
     void editPicture(PictureEditRequest pictureEditRequest, User loginUser);
 
     List<PictureVO> searchPictureByColor(Long spaceId, String picColor, User loginUser);
+
+    /**
+     * 创建扩图任务
+     *
+     * @param createPictureOutPaintingTaskRequest
+     * @param loginUser
+     */
+    CreateOutPaintingTaskResponse createPictureOutPaintingTask(CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest, User loginUser);
 }

@@ -1,17 +1,22 @@
 package com.xwz.xwzpicturebackend.controller;
 
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.xwz.xwzpicturebackend.annotation.AuthCheck;
+import com.xwz.xwzpicturebackend.api.aliyunai.AliYunAiApi;
+import com.xwz.xwzpicturebackend.api.aliyunai.model.CreateOutPaintingTaskResponse;
+import com.xwz.xwzpicturebackend.api.aliyunai.model.GetOutPaintingTaskResponse;
 import com.xwz.xwzpicturebackend.api.imagesearch.ImageSearchApiFacade;
 import com.xwz.xwzpicturebackend.api.imagesearch.model.ImageSearchResult;
 import com.xwz.xwzpicturebackend.common.BaseResponse;
 import com.xwz.xwzpicturebackend.common.DeleteRequest;
 import com.xwz.xwzpicturebackend.common.ResultUtils;
 import com.xwz.xwzpicturebackend.constant.UserConstant;
+import com.xwz.xwzpicturebackend.domain.dto.picture.CreatePictureOutPaintingTaskRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureEditRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureQueryRequest;
 import com.xwz.xwzpicturebackend.domain.dto.picture.PictureReviewRequest;
@@ -51,9 +56,15 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+
+import static com.xwz.xwzpicturebackend.constant.UserConstant.DEFAULT_ROLE;
 
 /**
  * @author 度星希
@@ -80,6 +91,9 @@ public class PictureController {
 
     @Resource
     private SpaceUserAuthManager spaceUserAuthManager;
+
+    @Resource
+    private AliYunAiApi aliYunAiApi;
 
 
 
@@ -283,6 +297,49 @@ public class PictureController {
         List<PictureVO> pictureVOList = pictureService.searchPictureByColor(spaceId, picColor, loginUser);
         return ResultUtils.success(pictureVOList);
     }
+
+    /**
+     * 创建 AI 扩图任务
+     * 完成： 添加接口限流，普通用户每日最多调用3次该接口
+     */
+    @PostMapping("/out_painting/create_task")
+    @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_EDIT)
+    public BaseResponse<CreateOutPaintingTaskResponse> createPictureOutPaintingTask(
+            @RequestBody CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest,
+            HttpServletRequest request) {
+        User user = userService.getLoginUser(request);
+        if (Objects.equals(user.getUserRole(), DEFAULT_ROLE)) {
+            // 按用户ID和日期生成Key
+            String key = "AI-TASK-LIMIT:" + user.getId() + ":" + LocalDate.now();
+            Long count = stringRedisTemplate.opsForValue().increment(key);
+            if (count == 1) {
+                // 设置过期时间为当天剩余秒数
+                long secondsUntilMidnight = LocalDateTime.now().until(
+                        LocalDate.now().plusDays(1).atStartOfDay(),
+                        ChronoUnit.SECONDS
+                );
+                stringRedisTemplate.expire(key, secondsUntilMidnight, TimeUnit.SECONDS);
+            }
+            ThrowUtils.throwIf(count > 3, ErrorCode.FORBIDDEN_ERROR, "今日调用次数已达上限");
+        }
+        if (createPictureOutPaintingTaskRequest == null || createPictureOutPaintingTaskRequest.getPictureId() == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        CreateOutPaintingTaskResponse response = pictureService.createPictureOutPaintingTask(createPictureOutPaintingTaskRequest, loginUser);
+        return ResultUtils.success(response);
+    }
+
+    /**
+     * 查询 AI 扩图任务
+     */
+    @GetMapping("/out_painting/get_task")
+    public BaseResponse<GetOutPaintingTaskResponse> getPictureOutPaintingTask(String taskId) {
+        ThrowUtils.throwIf(StrUtil.isBlank(taskId), ErrorCode.PARAMS_ERROR);
+        GetOutPaintingTaskResponse task = aliYunAiApi.getOutPaintingTask(taskId);
+        return ResultUtils.success(task);
+    }
+
 
 
     // endregion 其他接口
