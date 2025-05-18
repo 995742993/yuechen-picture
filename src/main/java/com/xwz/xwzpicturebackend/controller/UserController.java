@@ -4,16 +4,15 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.qcloud.cos.model.COSObject;
 import com.qcloud.cos.model.COSObjectInputStream;
 import com.qcloud.cos.utils.IOUtils;
-import com.xwz.xwzpicturebackend.manager.file.CosManager;
 import com.xwz.xwzpicturebackend.annotation.AuthCheck;
 import com.xwz.xwzpicturebackend.common.BaseResponse;
 import com.xwz.xwzpicturebackend.common.DeleteRequest;
 import com.xwz.xwzpicturebackend.common.ResultUtils;
 import com.xwz.xwzpicturebackend.constant.UserConstant;
-import com.xwz.xwzpicturebackend.domain.dto.user.UserLoginRequest;
-import com.xwz.xwzpicturebackend.domain.dto.user.UserRegisterRequest;
 import com.xwz.xwzpicturebackend.domain.dto.user.UserAddRequest;
+import com.xwz.xwzpicturebackend.domain.dto.user.UserLoginRequest;
 import com.xwz.xwzpicturebackend.domain.dto.user.UserQueryRequest;
+import com.xwz.xwzpicturebackend.domain.dto.user.UserRegisterRequest;
 import com.xwz.xwzpicturebackend.domain.dto.user.UserUpdateRequest;
 import com.xwz.xwzpicturebackend.domain.entity.User;
 import com.xwz.xwzpicturebackend.domain.vo.user.LoginUserVO;
@@ -21,10 +20,16 @@ import com.xwz.xwzpicturebackend.domain.vo.user.UserVO;
 import com.xwz.xwzpicturebackend.exception.BusinessException;
 import com.xwz.xwzpicturebackend.exception.ErrorCode;
 import com.xwz.xwzpicturebackend.exception.ThrowUtils;
+import com.xwz.xwzpicturebackend.manager.file.CosManager;
 import com.xwz.xwzpicturebackend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
@@ -61,6 +66,24 @@ public class UserController {
         String userPassword = userRegisterRequest.getUserPassword();
         String checkPassword = userRegisterRequest.getCheckPassword();
         long result = userService.userRegister(userAccount, userPassword, checkPassword);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 通过邮箱注册
+     * @param userRegisterRequest 用户请求实体
+     * @return
+     */
+    @PostMapping("/registerByEmail")
+    public BaseResponse<Long> userRegisterByEmail(@RequestBody UserRegisterRequest userRegisterRequest) {
+        // 先判空，使用异常工具类
+        ThrowUtils.throwIf(userRegisterRequest == null, ErrorCode.PARAMS_ERROR);
+        // 然后分别获取邮箱，密码，验证码
+        String userAccount = userRegisterRequest.getUserEmail();
+        String userPassword = userRegisterRequest.getUserPassword();
+        String checkPassword = userRegisterRequest.getCheckPassword();
+        String codeValue = userRegisterRequest.getCodeValue();
+        long result = userService.userRegisterByEmail(userAccount, userPassword, checkPassword, codeValue);
         return ResultUtils.success(result);
     }
 
@@ -246,6 +269,15 @@ public class UserController {
     }
 
 
+    /**
+     * 发送邮箱验证码
+     */
+    @PostMapping("/send/email/code")
+    public BaseResponse<String> sendEmailCode2(@RequestBody UserRegisterRequest userRegisterRequest) {
+        ThrowUtils.throwIf(userRegisterRequest == null, ErrorCode.PARAMS_ERROR, "参数为空");
+        User.validUserEmail(userRegisterRequest.getUserEmail());
+        return ResultUtils.success(userService.secureSendCode(userRegisterRequest.getUserEmail()));
+    }
 
 
 }

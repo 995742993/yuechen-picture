@@ -74,4 +74,9 @@ public interface UserService extends IService<User> {
      */
     boolean isAdmin(User user);
 
+    String sendEmailCode(String userEmail);
+
+    String secureSendCode(String userEmail);
+
+    long userRegisterByEmail(String userAccount, String userPassword, String checkPassword, String codeValue);
 }

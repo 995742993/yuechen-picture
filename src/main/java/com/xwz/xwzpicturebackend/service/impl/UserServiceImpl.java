@@ -3,9 +3,11 @@ package com.xwz.xwzpicturebackend.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xwz.xwzpicturebackend.constant.CacheKeyConstant;
 import com.xwz.xwzpicturebackend.constant.UserConstant;
 import com.xwz.xwzpicturebackend.domain.dto.user.UserQueryRequest;
 import com.xwz.xwzpicturebackend.domain.entity.User;
@@ -14,20 +16,37 @@ import com.xwz.xwzpicturebackend.domain.vo.user.LoginUserVO;
 import com.xwz.xwzpicturebackend.domain.vo.user.UserVO;
 import com.xwz.xwzpicturebackend.exception.BusinessException;
 import com.xwz.xwzpicturebackend.exception.ErrorCode;
+import com.xwz.xwzpicturebackend.exception.ThrowUtils;
 import com.xwz.xwzpicturebackend.manager.auth.StpKit;
+import com.xwz.xwzpicturebackend.manager.message.EmailManager;
+import com.xwz.xwzpicturebackend.manager.redis.RedisCache;
 import com.xwz.xwzpicturebackend.mapper.UserMapper;
 import com.xwz.xwzpicturebackend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static com.xwz.xwzpicturebackend.constant.CacheKeyConstant.EMAIL_CODE;
+import static com.xwz.xwzpicturebackend.constant.CacheKeyConstant.EMAIL_LOCK;
 import static com.xwz.xwzpicturebackend.constant.UserConstant.USER_LOGIN_STATE;
+import static com.xwz.xwzpicturebackend.exception.ErrorCode.OPERATION_ERROR;
 
 /**
 * @author yuelu
@@ -37,6 +56,12 @@ import static com.xwz.xwzpicturebackend.constant.UserConstant.USER_LOGIN_STATE;
 @Service
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService{
+
+    @Resource
+    private RedisCache redisCache;
+
+    @Resource
+    private EmailManager emailManager;
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword) {
@@ -72,6 +97,55 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (!saveResult) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");
         }
+        return user.getId();
+    }
+
+
+    @Override
+    public long userRegisterByEmail(String userAccount, String userPassword, String checkPassword, String codeValue) {
+        // 1. 校验
+        if (StrUtil.hasBlank(userAccount, userPassword, checkPassword, codeValue)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
+        }
+
+        // 检查验证码是否和redis的一致，邮箱即用户名
+        String codeKey = EMAIL_CODE + userAccount;
+        String code = redisCache.get(codeKey);
+        if (code == null || !code.equals(codeValue)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码错误");
+        }
+        if (userPassword.length() < 8 || checkPassword.length() < 8) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码过短");
+        }
+        if (!userPassword.equals(checkPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "两次输入的密码不一致");
+        }
+
+        // 2. 检查是否重复
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("userAccount", userAccount);
+        long count = this.baseMapper.selectCount(queryWrapper);
+        if (count > 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号重复");
+        }
+        // 3. 加密
+        String encryptPassword = getEncryptPassword(userPassword);
+        // 4. 插入数据
+        User user = new User();
+        user.setUserAccount(userAccount);
+        user.setUserPassword(encryptPassword);
+        user.setUserName("无名");
+        user.setUserRole(UserRoleEnum.USER.getValue());
+        user.setUserEmail(userAccount);
+        boolean saveResult = this.save(user);
+        if (!saveResult) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");
+        }
+        redisTemplate.opsForValue().set(codeKey, code, CODE_TTL, TimeUnit.SECONDS);
+        // 邮件发送完成了，并且redis的验证码key也设置好了，然后可以释放掉锁key了，之后如果还是有同样的请求进来会被第二个锁检测到
+        redisCache.delete(codeKey);
+        String lockKey = EMAIL_LOCK + userAccount;
+        redisCache.delete(lockKey);
         return user.getId();
     }
 
@@ -130,7 +204,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 先判断是否已登录
         Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
         if (userObj == null) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "未登录");
+            throw new BusinessException(OPERATION_ERROR, "未登录");
         }
         // 移除登录态
         request.getSession().removeAttribute(USER_LOGIN_STATE);
@@ -204,7 +278,104 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
 
 
+    // 统一有效期（秒）5分钟
+    private static final long CODE_TTL = 300;
 
+
+    /**
+     * 发送邮箱验证码
+     *
+     * @param userEmail 用户邮箱
+     * @return 验证码 key
+     */
+    @Override
+    @Deprecated
+    public String sendEmailCode(String userEmail) {
+        // 查询数据库是否已经包含这个邮箱
+        Long count = this.getBaseMapper().selectCount(new QueryWrapper<User>().eq("user_email", userEmail));
+        ThrowUtils.throwIf(count > 0, ErrorCode.PARAMS_ERROR, "账号已存在, 请直接登录!");
+        // 发送验证码
+        String code = RandomUtil.randomNumbers(4);
+        Map<String, Object> contentMap = new HashMap<>();
+        contentMap.put("code", code);
+        // 生成一个唯一 ID, 后面注册前端需要带过来
+        String key = UUID.randomUUID().toString();
+        // Start >>> 优化内容：异步邮件发送
+        CompletableFuture.runAsync(() -> {
+            try {
+                // 发送验证码
+                emailManager.sendEmail(userEmail, "注册验证码 - 月辰云图库", contentMap);
+            } catch (Exception e) {
+                throw new BusinessException(OPERATION_ERROR, "邮件发送失败");
+            }
+        }).thenRunAsync(() -> {
+            // 当发送验证码错误的时候，不会执行存储验证码到redis
+            // 存储验证码到redis 5 分钟过期
+            redisCache.set(String.format(CacheKeyConstant.EMAIL_CODE_KEY, key, userEmail), code, 5, TimeUnit.MINUTES);
+        });
+        // End >>> 优化内容：异步邮件发送
+        return key;
+	}
+
+    @Resource
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
+    @Qualifier("releaseLockScript")
+    private RedisScript<Long> releaseLockScript;
+
+    /**
+     * 安全发送验证码（100%防并发）
+     */
+    @Override
+    public String secureSendCode(String userEmail) {
+        String lockKey = EMAIL_LOCK + userEmail;
+        String codeKey = EMAIL_CODE + userEmail;
+        // 1. 获取分布式锁
+        String lockValue = UUID.randomUUID().toString();
+        boolean locked = Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, CODE_TTL, TimeUnit.SECONDS));
+        if (!locked) {
+            throw new BusinessException(OPERATION_ERROR, "操作过于频繁");
+        }
+        try {
+            // 2. 双重检查是否已存在有效验证码
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(codeKey))) {
+                throw new BusinessException(OPERATION_ERROR, "验证码已发送");
+            }
+            // 查询数据库是否已经包含这个邮箱
+            Long count = this.getBaseMapper().selectCount(new QueryWrapper<User>().eq("userAccount", userEmail));
+            ThrowUtils.throwIf(count > 0, ErrorCode.PARAMS_ERROR, "账号已存在, 请直接登录!");
+            // 3. 生成并存储验证码
+            String code = RandomUtil.randomNumbers(4);
+            Map<String, Object> contentMap = new HashMap<>();
+            contentMap.put("code", code);
+            // Start >>> 优化内容：异步邮件发送
+            CompletableFuture.runAsync(() -> {
+                try {
+                    // 发送验证码
+                    emailManager.sendEmail(userEmail, "注册验证码 - 月辰云图库", contentMap);
+                } catch (Exception e) {
+                    // 发送失败就释放锁
+                    redisTemplate.execute(releaseLockScript, Collections.singletonList(lockKey), lockValue);
+                    throw new BusinessException(OPERATION_ERROR, "邮件发送失败");
+                }
+            }).thenRunAsync(() -> {
+                // 当发送验证码错误的时候，不会执行存储验证码到redis
+                // 存储验证码到redis 5 分钟过期
+                // 验证码key需要登完成注册流程之后才释放
+                redisTemplate.opsForValue().set(codeKey, code, CODE_TTL, TimeUnit.SECONDS);
+                // 邮件发送完成了，并且redis的验证码key也设置好了，然后可以释放掉锁key了，之后如果还是有同样的请求进来会被第二个锁检测到
+                redisTemplate.execute(releaseLockScript, Collections.singletonList(lockKey), lockValue);
+
+            });
+            return code;
+        }
+        finally {
+            // 不能在此处释放锁，因为在并发场景下提前释放掉锁之后会导致一开始的请求重复打到发邮件那一步
+            // 直接在redis客户端执行lua脚本命令
+            // redisTemplate.execute(releaseLockScript, Collections.singletonList(lockKey), lockValue);
+        }
+    }
 }
 
 

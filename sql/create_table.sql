@@ -111,3 +111,7 @@ create table if not exists space_user
 -- 以图搜图功能：添加字段
 ALTER TABLE picture
     ADD COLUMN picColor varchar(16) null comment '图片主色调';
+
+-- 添加新列：用户表邮箱字段
+ALTER TABLE user
+    ADD COLUMN userEmail  VARCHAR(50)  NOT NULL COMMENT '用户邮箱';

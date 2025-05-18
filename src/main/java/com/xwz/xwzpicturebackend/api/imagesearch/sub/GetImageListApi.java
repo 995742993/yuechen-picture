@@ -65,9 +65,9 @@ public class GetImageListApi {
         return JSONUtil.toList(list, ImageSearchResult.class);
     }
 
-    public static void main(String[] args) {
-        String url = "https://graph.baidu.com/ajax/pcsimi?carousel=503&entrance=GENERAL&extUiData%5BisLogoShow%5D=1&inspire=general_pc&limit=30&next=2&render_type=card&session_id=16807215483560291501&sign=1260249a5bc125ca16d5a01746338661&tk=a2198&tpl_from=pc";
-        List<ImageSearchResult> imageList = getImageList(url);
-        System.out.println("搜索成功" + imageList);
-    }
+//    public static void main(String[] args) {
+//        String url = "https://graph.baidu.com/ajax/pcsimi?carousel=503&entrance=GENERAL&extUiData%5BisLogoShow%5D=1&inspire=general_pc&limit=30&next=2&render_type=card&session_id=16807215483560291501&sign=1260249a5bc125ca16d5a01746338661&tk=a2198&tpl_from=pc";
+//        List<ImageSearchResult> imageList = getImageList(url);
+//        System.out.println("搜索成功" + imageList);
+//    }
 }

@@ -57,10 +57,10 @@ public class GetImageFirstUrlApi {
         }
     }
 
-    public static void main(String[] args) {
-        // 请求目标 URL
-        String url = "https://graph.baidu.com/s?card_key=&entrance=GENERAL&extUiData%5BisLogoShow%5D=1&f=all&isLogoShow=1&session_id=16807215483560291501&sign=1260249a5bc125ca16d5a01746338661&tpl_from=pc";
-        String imageFirstUrl = getImageFirstUrl(url);
-        System.out.println("搜索成功，结果 URL：" + imageFirstUrl);
-    }
+//    public static void main(String[] args) {
+//        // 请求目标 URL
+//        String url = "https://graph.baidu.com/s?card_key=&entrance=GENERAL&extUiData%5BisLogoShow%5D=1&f=all&isLogoShow=1&session_id=16807215483560291501&sign=1260249a5bc125ca16d5a01746338661&tpl_from=pc";
+//        String imageFirstUrl = getImageFirstUrl(url);
+//        System.out.println("搜索成功，结果 URL：" + imageFirstUrl);
+//    }
 }

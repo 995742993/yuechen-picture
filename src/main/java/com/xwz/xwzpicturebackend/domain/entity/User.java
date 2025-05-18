@@ -1,9 +1,14 @@
 package com.xwz.xwzpicturebackend.domain.entity;
 
+import cn.hutool.core.lang.RegexPool;
+import cn.hutool.core.util.ReUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.xwz.xwzpicturebackend.exception.BusinessException;
+import com.xwz.xwzpicturebackend.exception.ErrorCode;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -68,10 +73,22 @@ public class User implements Serializable {
     private Date updateTime;
 
     /**
+     * 邮箱
+     */
+    private String userEmail;
+
+
+    /**
      * 是否删除（逻辑删除）
      */
     @TableLogic
     private Integer isDelete;
 
     private static final long serialVersionUID = 1L;
+
+    public static void validUserEmail(String userEmail) {
+        if (StrUtil.isEmpty(userEmail) || !ReUtil.isMatch(RegexPool.EMAIL, userEmail)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱格式错误");
+        }
+    }
 }
