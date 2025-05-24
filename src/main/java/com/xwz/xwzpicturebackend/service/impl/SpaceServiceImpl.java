@@ -177,7 +177,6 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space> implements
         // 对象列表 => 封装对象列表
         List<SpaceVO> spaceVOList = spaceList.stream()
                 .map(SpaceVO::objToVo)
-                .distinct()
                 .collect(Collectors.toList());
         // 1. 关联查询用户信息
         // 1,2,3,4
