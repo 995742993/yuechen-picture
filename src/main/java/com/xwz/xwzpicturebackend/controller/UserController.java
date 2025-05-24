@@ -82,8 +82,8 @@ public class UserController {
         String userAccount = userRegisterRequest.getUserEmail();
         String userPassword = userRegisterRequest.getUserPassword();
         String checkPassword = userRegisterRequest.getCheckPassword();
-        String codeValue = userRegisterRequest.getCodeValue();
-        long result = userService.userRegisterByEmail(userAccount, userPassword, checkPassword, codeValue);
+        String captcha = userRegisterRequest.getCaptcha();
+        long result = userService.userRegisterByEmail(userAccount, userPassword, checkPassword, captcha);
         return ResultUtils.success(result);
     }
 
@@ -273,7 +273,7 @@ public class UserController {
      * 发送邮箱验证码
      */
     @PostMapping("/send/email/code")
-    public BaseResponse<String> sendEmailCode2(@RequestBody UserRegisterRequest userRegisterRequest) {
+    public BaseResponse<String> sendEmailCode(@RequestBody UserRegisterRequest userRegisterRequest) {
         ThrowUtils.throwIf(userRegisterRequest == null, ErrorCode.PARAMS_ERROR, "参数为空");
         User.validUserEmail(userRegisterRequest.getUserEmail());
         return ResultUtils.success(userService.secureSendCode(userRegisterRequest.getUserEmail()));
