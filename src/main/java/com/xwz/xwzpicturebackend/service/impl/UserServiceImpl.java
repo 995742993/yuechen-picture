@@ -102,16 +102,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
 
     @Override
-    public long userRegisterByEmail(String userAccount, String userPassword, String checkPassword, String codeValue) {
+    public long userRegisterByEmail(String userAccount, String userPassword, String checkPassword, String captcha) {
         // 1. 校验
-        if (StrUtil.hasBlank(userAccount, userPassword, checkPassword, codeValue)) {
+        if (StrUtil.hasBlank(userAccount, userPassword, checkPassword, captcha)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
         }
 
         // 检查验证码是否和redis的一致，邮箱即用户名
         String codeKey = EMAIL_CODE + userAccount;
         String code = redisCache.get(codeKey);
-        if (code == null || !code.equals(codeValue)) {
+        if (code == null || !code.equals(captcha)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码错误");
         }
         if (userPassword.length() < 8 || checkPassword.length() < 8) {

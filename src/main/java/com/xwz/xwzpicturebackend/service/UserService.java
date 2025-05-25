@@ -78,5 +78,5 @@ public interface UserService extends IService<User> {
 
     String secureSendCode(String userEmail);
 
-    long userRegisterByEmail(String userAccount, String userPassword, String checkPassword, String codeValue);
+    long userRegisterByEmail(String userAccount, String userPassword, String checkPassword, String captcha);
 }

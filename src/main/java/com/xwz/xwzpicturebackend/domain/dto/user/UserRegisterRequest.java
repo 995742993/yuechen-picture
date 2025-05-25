@@ -36,9 +36,9 @@ public class UserRegisterRequest implements Serializable {
     private String userEmail;
 
     /**
-     * 验证码 value
+     * 验证码
      */
-    private String codeValue;
+    private String captcha;
 
 }
 

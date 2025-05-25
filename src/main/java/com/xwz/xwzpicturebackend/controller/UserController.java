@@ -5,9 +5,6 @@ import com.qcloud.cos.model.COSObject;
 import com.qcloud.cos.model.COSObjectInputStream;
 import com.qcloud.cos.utils.IOUtils;
 import com.xwz.xwzpicturebackend.annotation.AuthCheck;
-import com.xwz.xwzpicturebackend.annotation.ratelimit.RateLimiter;
-import com.xwz.xwzpicturebackend.annotation.ratelimit.RateLimiters;
-import com.xwz.xwzpicturebackend.annotation.ratelimit.RateRule;
 import com.xwz.xwzpicturebackend.common.BaseResponse;
 import com.xwz.xwzpicturebackend.common.DeleteRequest;
 import com.xwz.xwzpicturebackend.common.ResultUtils;
@@ -18,7 +15,6 @@ import com.xwz.xwzpicturebackend.domain.dto.user.UserQueryRequest;
 import com.xwz.xwzpicturebackend.domain.dto.user.UserRegisterRequest;
 import com.xwz.xwzpicturebackend.domain.dto.user.UserUpdateRequest;
 import com.xwz.xwzpicturebackend.domain.entity.User;
-import com.xwz.xwzpicturebackend.domain.enums.LimitTypeEnum;
 import com.xwz.xwzpicturebackend.domain.vo.user.LoginUserVO;
 import com.xwz.xwzpicturebackend.domain.vo.user.UserVO;
 import com.xwz.xwzpicturebackend.exception.BusinessException;
@@ -43,7 +39,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author 度星希
@@ -80,22 +75,7 @@ public class UserController {
      * @param userRegisterRequest 用户请求实体
      * @return
      */
-    @RateLimiters(rateLimiters = {
-            @RateLimiter(
-                    limitTypeEnum = LimitTypeEnum.USER_ID,
-                    rateRules = {@RateRule(
-                            timeDuration = 1,
-                            timeUnit = TimeUnit.MINUTES
-                    )
-                    }),
-            @RateLimiter(
-                    limitTypeEnum = LimitTypeEnum.IP,
-                    rateRules = {@RateRule(
-                            timeDuration = 1,
-                            timeUnit = TimeUnit.MINUTES
-                    )
-                    })
-    })
+
     @PostMapping("/registerByEmail")
     public BaseResponse<Long> userRegisterByEmail(@RequestBody UserRegisterRequest userRegisterRequest) {
         // 先判空，使用异常工具类
@@ -104,8 +84,8 @@ public class UserController {
         String userAccount = userRegisterRequest.getUserEmail();
         String userPassword = userRegisterRequest.getUserPassword();
         String checkPassword = userRegisterRequest.getCheckPassword();
-        String codeValue = userRegisterRequest.getCodeValue();
-        long result = userService.userRegisterByEmail(userAccount, userPassword, checkPassword, codeValue);
+        String captcha = userRegisterRequest.getCaptcha();
+        long result = userService.userRegisterByEmail(userAccount, userPassword, checkPassword, captcha);
         return ResultUtils.success(result);
     }
 
@@ -309,22 +289,7 @@ public class UserController {
     /**
      * 发送邮箱验证码
      */
-    @RateLimiters(rateLimiters = {
-            @RateLimiter(
-                    limitTypeEnum = LimitTypeEnum.USER_ID,
-                    rateRules = {@RateRule(
-                            timeDuration = 1,
-                            timeUnit = TimeUnit.MINUTES
-                    )
-                    }),
-            @RateLimiter(
-                    limitTypeEnum = LimitTypeEnum.IP,
-                    rateRules = {@RateRule(
-                            timeDuration = 1,
-                            timeUnit = TimeUnit.MINUTES
-                    )
-                    })
-    })
+
     @PostMapping("/send/email/code")
     public BaseResponse<String> sendEmailCode2(@RequestBody UserRegisterRequest userRegisterRequest) {
         ThrowUtils.throwIf(userRegisterRequest == null, ErrorCode.PARAMS_ERROR, "参数为空");
