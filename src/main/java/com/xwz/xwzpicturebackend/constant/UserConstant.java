@@ -25,6 +25,11 @@ public interface UserConstant {
      */
     String ADMIN_ROLE = "admin";
 
+    /**
+     * 管理员角色
+     */
+    String SUPER_ADMIN_ROLE = "superAdmin";
+
     // endregion
 }
 

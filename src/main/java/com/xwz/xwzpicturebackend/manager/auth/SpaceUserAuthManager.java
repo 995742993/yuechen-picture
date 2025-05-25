@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static com.xwz.xwzpicturebackend.constant.UserConstant.SUPER_ADMIN_ROLE;
+
 /**
  * 空间成员权限管理
  */
@@ -80,6 +82,9 @@ public class SpaceUserAuthManager {
         }
         // 管理员权限
         List<String> ADMIN_PERMISSIONS = getPermissionsByRole(SpaceRoleEnum.ADMIN.getValue());
+        if (loginUser.getUserRole().equals(SUPER_ADMIN_ROLE)) {
+            return ADMIN_PERMISSIONS;
+        }
         // 公共图库
         if (space == null) {
             if (userService.isAdmin(loginUser)) {

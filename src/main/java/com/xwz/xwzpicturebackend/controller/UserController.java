@@ -42,6 +42,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -141,8 +142,13 @@ public class UserController {
      */
     @PostMapping("/add")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Long> addUser(@RequestBody UserAddRequest userAddRequest) {
+    public BaseResponse<Long> addUser(@RequestBody UserAddRequest userAddRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(userAddRequest == null, ErrorCode.PARAMS_ERROR);
+        // 添加再次校验的规则：只有超级管理员才有权限操作
+        User loginUser = userService.getLoginUser(request);
+        if (!Objects.equals(loginUser.getUserRole(), "superAdmin")) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
         User user = new User();
         BeanUtils.copyProperties(userAddRequest, user);
         // 默认密码 12345678
@@ -181,9 +187,14 @@ public class UserController {
      */
     @PostMapping("/delete")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> deleteUser(@RequestBody DeleteRequest deleteRequest) {
+    public BaseResponse<Boolean> deleteUser(@RequestBody DeleteRequest deleteRequest, HttpServletRequest request) {
         if (deleteRequest == null || deleteRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 添加再次校验的规则：只有超级管理员才有权限操作
+        User loginUser = userService.getLoginUser(request);
+        if (!Objects.equals(loginUser.getUserRole(), "superAdmin")) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         boolean b = userService.removeById(deleteRequest.getId());
         return ResultUtils.success(b);
@@ -194,9 +205,14 @@ public class UserController {
      */
     @PostMapping("/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest) {
+    public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest, HttpServletRequest request) {
         if (userUpdateRequest == null || userUpdateRequest.getId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 添加再次校验的规则：只有超级管理员才有权限操作
+        User loginUser = userService.getLoginUser(request);
+        if (!Objects.equals(loginUser.getUserRole(), "superAdmin")) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         User user = new User();
         BeanUtils.copyProperties(userUpdateRequest, user);

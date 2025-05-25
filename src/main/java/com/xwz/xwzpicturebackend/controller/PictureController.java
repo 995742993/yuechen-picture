@@ -586,13 +586,31 @@ public class PictureController {
     }
 
     /**
-     * TODO 仅管理员，后续改成但用户单接口一天3次
+     *  批量获取图片
      * @param pictureUploadByBatchRequest
      * @param request
      * @return
      */
     @PostMapping("/upload/batch")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @RateLimiters(rateLimiters = {
+            @RateLimiter(
+                    limitTypeEnum = LimitTypeEnum.USER_ID,
+                    rateRules = {@RateRule(
+                            limit = 5,
+                            timeDuration = 24,
+                            timeUnit = TimeUnit.HOURS
+                    )
+                    }),
+            @RateLimiter(
+                    limitTypeEnum = LimitTypeEnum.IP,
+                    rateRules = {@RateRule(
+                            limit = 5,
+                            timeDuration = 24,
+                            timeUnit = TimeUnit.HOURS
+                    )
+                    })
+    })
+    // @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Integer> uploadPictureByBatch(
             @RequestBody PictureUploadByBatchRequest pictureUploadByBatchRequest,
             HttpServletRequest request
