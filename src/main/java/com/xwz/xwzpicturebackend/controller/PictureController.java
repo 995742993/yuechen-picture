@@ -7,6 +7,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.xwz.xwzpicturebackend.annotation.AuthCheck;
+import com.xwz.xwzpicturebackend.annotation.ratelimit.RateLimiter;
+import com.xwz.xwzpicturebackend.annotation.ratelimit.RateLimiters;
+import com.xwz.xwzpicturebackend.annotation.ratelimit.RateRule;
 import com.xwz.xwzpicturebackend.api.aliyunai.AliYunAiApi;
 import com.xwz.xwzpicturebackend.api.aliyunai.model.CreateOutPaintingTaskResponse;
 import com.xwz.xwzpicturebackend.api.aliyunai.model.GetOutPaintingTaskResponse;
@@ -29,6 +32,7 @@ import com.xwz.xwzpicturebackend.domain.entity.Picture;
 import com.xwz.xwzpicturebackend.domain.entity.PictureTagCategory;
 import com.xwz.xwzpicturebackend.domain.entity.Space;
 import com.xwz.xwzpicturebackend.domain.entity.User;
+import com.xwz.xwzpicturebackend.domain.enums.LimitTypeEnum;
 import com.xwz.xwzpicturebackend.domain.enums.PictureReviewStatusEnum;
 import com.xwz.xwzpicturebackend.domain.vo.picture.PictureVO;
 import com.xwz.xwzpicturebackend.exception.BusinessException;
@@ -269,8 +273,24 @@ public class PictureController {
     }
 
     /**
-     * 以图搜图
+     * 以图搜图：单接口单IP一分钟10次，单接口单用户
      */
+    @RateLimiters(rateLimiters = {
+            @RateLimiter(
+                    limitTypeEnum = LimitTypeEnum.USER_ID,
+                    rateRules = {@RateRule(
+                            timeDuration = 1,
+                            timeUnit = TimeUnit.MINUTES
+                    )
+                    }),
+            @RateLimiter(
+                    limitTypeEnum = LimitTypeEnum.IP,
+                    rateRules = {@RateRule(
+                            timeDuration = 1,
+                            timeUnit = TimeUnit.MINUTES
+                    )
+                    })
+    })
     @PostMapping("/search/picture")
     public BaseResponse<List<ImageSearchResult>> searchPictureByPicture(@RequestBody SearchPictureByPictureRequest searchPictureByPictureRequest) {
         ThrowUtils.throwIf(searchPictureByPictureRequest == null, ErrorCode.PARAMS_ERROR);
@@ -300,10 +320,28 @@ public class PictureController {
 
     /**
      * 创建 AI 扩图任务
-     * 完成： 添加接口限流，普通用户每日最多调用3次该接口
+     * 完成： 添加接口限流，普通用户每日最多调用5次该接口，单IP也最多5次
      */
     @PostMapping("/out_painting/create_task")
     @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_EDIT)
+    @RateLimiters(rateLimiters = {
+            @RateLimiter(
+                    limitTypeEnum = LimitTypeEnum.USER_ID,
+                    rateRules = {@RateRule(
+                            limit = 5,
+                            timeDuration = 24,
+                            timeUnit = TimeUnit.HOURS
+                    )
+                    }),
+            @RateLimiter(
+                    limitTypeEnum = LimitTypeEnum.IP,
+                    rateRules = {@RateRule(
+                            limit = 5,
+                            timeDuration = 24,
+                            timeUnit = TimeUnit.HOURS
+                    )
+                    })
+    })
     public BaseResponse<CreateOutPaintingTaskResponse> createPictureOutPaintingTask(
             @RequestBody CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest,
             HttpServletRequest request) {
