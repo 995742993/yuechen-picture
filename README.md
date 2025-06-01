@@ -11,6 +11,9 @@ https://gitee.com/du-yuelang/yuechen-picture/blob/dev/%E7%B3%BB%E7%BB%9F%E6%9E%B
 
 https://gitee.com/du-yuelang/yuechen-picture/blob/dev/%E9%A1%B9%E7%9B%AE%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E%E6%96%87%E6%A1%A3.md
 
+#### 关键技术方案实现思路
+https://gitee.com/du-yuelang/yuechen-picture/wikis/Home
+
 #### 迭代开发清单
 - [x] 用户注册优化：通过邮箱验证码进行注册
 - [x] 特殊接口限流处理，例如AI编辑功能，以及AI扩图功能
