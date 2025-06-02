@@ -1,7 +1,7 @@
 # yuechenPicture
 
 #### 介绍
-月辰图库项目
+月辰图库项目：http://39.104.69.233/space/1925553280159563777（用户名：admin001，密码：admin001）
 
 #### 软件架构
 https://gitee.com/du-yuelang/yuechen-picture/blob/dev/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1%E6%B5%81%E7%A8%8B.md
