@@ -5,12 +5,12 @@
 用户名&密码都是：admin001
 
 #### 软件架构
-https://gitee.com/du-yuelang/yuechen-picture/blob/dev/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1%E6%B5%81%E7%A8%8B.md
+https://github.com/995742993/yuechen-picture/blob/dev/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1%E6%B5%81%E7%A8%8B.md
 
 
 #### 使用说明&用户名密码
 
-https://gitee.com/du-yuelang/yuechen-picture/blob/dev/%E9%A1%B9%E7%9B%AE%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E%E6%96%87%E6%A1%A3.md
+https://github.com/995742993/yuechen-picture/blob/dev/%E9%A1%B9%E7%9B%AE%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E%E6%96%87%E6%A1%A3.md
 
 #### 关键技术方案实现思路
 https://gitee.com/du-yuelang/yuechen-picture/wikis/Home
